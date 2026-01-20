@@ -20,6 +20,7 @@ dependencies = [
 [project.scripts]
 holded-mcp = "holded_mcp.__main__:main"
 holded-mcp-stdio = "holded_mcp.stdio:main"
+holded-cli = "holded_mcp.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/holded_mcp"]

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime as dt
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -9,6 +8,17 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from .config import Settings
 from .holded_client import HoldedClient
+from .invoices import (
+    approve_invoice,
+    create_invoice,
+    delete_invoice,
+    get_invoice,
+    invoice_pdf,
+    list_invoices,
+    pay_invoice,
+    send_invoice,
+    update_invoice,
+)
 
 
 @dataclass(frozen=True)
@@ -53,50 +63,24 @@ async def holded_invoices_list(
     - dateFrom/dateTo/updatedFrom/updatedTo: YYYY-MM-DD
     - status: según Holded (p.ej. 0 borrador, 1 pendiente, 2 aprobada)
     """
-    params: dict[str, Any] = {}
-    for key, value in {
-        "status": status,
-        "current": current,
-        "dateFrom": dateFrom,
-        "dateTo": dateTo,
-        "updatedFrom": updatedFrom,
-        "updatedTo": updatedTo,
-        "sort": sort,
-        "order": order,
-        "limit": limit,
-        "offset": offset,
-    }.items():
-        if value is not None:
-            params[key] = value
-    items = await _ctx_holded(ctx).request("GET", "/documents/invoice", params=params)
-
-    # Holded's date filters may not be consistently applied by the API, so we
-    # also filter client-side when the caller provides a date range.
-    if (dateFrom is not None or dateTo is not None) and isinstance(items, list):
-        start = dt.date.fromisoformat(dateFrom) if dateFrom is not None else None
-        end = dt.date.fromisoformat(dateTo) if dateTo is not None else None
-
-        filtered: list[Any] = []
-        for it in items:
-            if not isinstance(it, dict):
-                continue
-            ts = it.get("date")
-            if not isinstance(ts, (int, float)):
-                continue
-            d = dt.datetime.utcfromtimestamp(ts).date()
-            if start is not None and d < start:
-                continue
-            if end is not None and d > end:
-                continue
-            filtered.append(it)
-        items = filtered
-
-    return {"items": items}
+    return await list_invoices(
+        _ctx_holded(ctx),
+        status=status,
+        current=current,
+        date_from=dateFrom,
+        date_to=dateTo,
+        updated_from=updatedFrom,
+        updated_to=updatedTo,
+        sort=sort,
+        order=order,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @mcp.tool(description="Obtiene una factura por id (GET /documents/invoice/{documentId}).")
 async def holded_invoices_get(ctx: Context, documentId: str) -> dict[str, Any]:
-    return await _ctx_holded(ctx).request("GET", f"/documents/invoice/{documentId}")
+    return await get_invoice(_ctx_holded(ctx), documentId)
 
 
 @mcp.tool(
@@ -106,7 +90,7 @@ async def holded_invoices_get(ctx: Context, documentId: str) -> dict[str, Any]:
     )
 )
 async def holded_invoices_create(ctx: Context, payload: dict[str, Any]) -> dict[str, Any]:
-    return await _ctx_holded(ctx).request("POST", "/documents/invoice", json_body=payload)
+    return await create_invoice(_ctx_holded(ctx), payload)
 
 
 @mcp.tool(
@@ -120,7 +104,7 @@ async def holded_invoices_update(
     documentId: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    return await _ctx_holded(ctx).request("PUT", f"/documents/invoice/{documentId}", json_body=payload)
+    return await update_invoice(_ctx_holded(ctx), documentId, payload)
 
 
 @mcp.tool(
@@ -138,12 +122,12 @@ async def holded_invoices_approve(
     # El endpoint de aprobación de la app web no requiere body; solo POST.
     # Conservamos info por compatibilidad futura (no se envía).
     _ = info  # unused
-    return await _ctx_holded(ctx).request("POST", f"/doc/invoice/{documentId}/draftmode/approve")
+    return await approve_invoice(_ctx_holded(ctx), documentId)
 
 
 @mcp.tool(description="Elimina una factura (DELETE /documents/invoice/{documentId}).")
 async def holded_invoices_delete(ctx: Context, documentId: str) -> dict[str, Any]:
-    return await _ctx_holded(ctx).request("DELETE", f"/documents/invoice/{documentId}")
+    return await delete_invoice(_ctx_holded(ctx), documentId)
 
 
 @mcp.tool(description="Marca una factura como pagada (POST /documents/invoice/{documentId}/pay).")
@@ -155,12 +139,14 @@ async def holded_invoices_pay(
     treasury: str | None = None,
     desc: str | None = None,
 ) -> dict[str, Any]:
-    payload: dict[str, Any] = {"date": date, "amount": amount}
-    if treasury is not None:
-        payload["treasury"] = treasury
-    if desc is not None:
-        payload["desc"] = desc
-    return await _ctx_holded(ctx).request("POST", f"/documents/invoice/{documentId}/pay", json_body=payload)
+    return await pay_invoice(
+        _ctx_holded(ctx),
+        documentId,
+        date=date,
+        amount=amount,
+        treasury=treasury,
+        desc=desc,
+    )
 
 
 @mcp.tool(description="Envía una factura por email (POST /documents/invoice/{documentId}/send).")
@@ -173,18 +159,17 @@ async def holded_invoices_send(
     mailTemplateId: str | None = None,
     docIds: str | None = None,
 ) -> dict[str, Any]:
-    payload: dict[str, Any] = {"emails": emails}
-    if subject is not None:
-        payload["subject"] = subject
-    if message is not None:
-        payload["message"] = message
-    if mailTemplateId is not None:
-        payload["mailTemplateId"] = mailTemplateId
-    if docIds is not None:
-        payload["docIds"] = docIds
-    return await _ctx_holded(ctx).request("POST", f"/documents/invoice/{documentId}/send", json_body=payload)
+    return await send_invoice(
+        _ctx_holded(ctx),
+        documentId,
+        emails=emails,
+        subject=subject,
+        message=message,
+        mail_template_id=mailTemplateId,
+        doc_ids=docIds,
+    )
 
 
 @mcp.tool(description="Obtiene el PDF (base64) de una factura (GET /documents/invoice/{documentId}/pdf).")
 async def holded_invoices_pdf(ctx: Context, documentId: str) -> dict[str, Any]:
-    return await _ctx_holded(ctx).request("GET", f"/documents/invoice/{documentId}/pdf")
+    return await invoice_pdf(_ctx_holded(ctx), documentId)

@@ -1,45 +1,90 @@
 # holded-mcp
 
-Servidor MCP en Python (SDK `mcp` + `FastMCP`) montado en **FastAPI** para gestionar **facturas (invoicing)** de Holded.
+Python MCP server (mcp SDK + FastMCP) on **FastAPI** to manage Holded **invoices (invoicing)**.
 
-## Requisitos
+## Requirements
 
 - Python 3.10+
-- Variable de entorno `HOLDED_API_KEY`
+- `HOLDED_API_KEY` environment variable
 
-## Ejecutar en local
+## Run locally
 
 ```bash
 uv sync
-export HOLDED_API_KEY="tu_api_key"
+export HOLDED_API_KEY="your_api_key"
 uv run uvicorn holded_mcp.app:app --host 0.0.0.0 --port 8000
 ```
 
-Luego el endpoint MCP queda en:
+MCP endpoint:
 
 - `http://localhost:8000/mcp`
 
-## Usarlo desde Codex vía STDIO (recomendado)
+## CLI (no MCP)
 
-1) En el repo:
+This repo also ships a CLI to call the same Holded endpoints.
+
+```bash
+export HOLDED_API_KEY="your_api_key"
+holded-cli list --limit 5
+```
+
+If you did not install it globally yet, prefix with `uv run` from the repo:
 
 ```bash
 uv sync
-export HOLDED_API_KEY="tu_api_key"
+export HOLDED_API_KEY="your_api_key"
+uv run holded-cli list --limit 5
 ```
 
-2) En `~/.codex/config.toml`:
+### Global install (editable)
+
+To use `holded-cli` from any folder and keep it updated as you edit the repo:
+
+```bash
+uv tool install -e .
+uv tool update-shell
+```
+
+Or run the helper:
+
+```bash
+scripts/install-cli.sh
+```
+
+Examples (global install):
+
+```bash
+holded-cli get <document_id>
+holded-cli create --payload @invoice.json
+holded-cli update <document_id> --payload @invoice.json
+holded-cli approve <document_id>
+holded-cli delete <document_id>
+holded-cli pay <document_id> --date 1700000000 --amount 100.0
+holded-cli send <document_id> --emails "a@b.com,c@d.com"
+holded-cli pdf <document_id>
+```
+
+## Use from Codex via STDIO (recommended)
+
+1) In the repo:
+
+```bash
+uv sync
+export HOLDED_API_KEY="your_api_key"
+```
+
+2) In `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.holded]
 command = "uv"
 args = ["run", "--quiet", "python", "server.py"]
-cwd = "/Users/antonio/Documents/Develop/mcp/holded-mcp"
+cwd = "/Users/antonio/Projects/antoniolg/holded-mcp"
 env_vars = ["HOLDED_API_KEY"]
 ```
 
-## Variables de entorno
+## Environment variables
 
-- `HOLDED_API_KEY` (obligatoria)
-- `HOLDED_BASE_URL` (opcional, por defecto `https://api.holded.com/api/invoicing/v1`)
-- `HOLDED_TIMEOUT_SECONDS` (opcional, por defecto `20`)
+- `HOLDED_API_KEY` (required)
+- `HOLDED_BASE_URL` (optional, defaults to `https://api.holded.com/api/invoicing/v1`)
+- `HOLDED_TIMEOUT_SECONDS` (optional, defaults to `20`)
