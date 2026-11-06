@@ -1,3 +1,7 @@
+> [!WARNING]
+> **Archivado · Archived.** Este servidor MCP ya no se mantiene y sus dependencias no se actualizan: úsalo bajo tu responsabilidad. This MCP server is no longer maintained and its dependencies are not updated: use it at your own risk.
+> Lo que enseño ahora · What I teach now: [devexpert.io](https://devexpert.io)
+
 # holded-mcp
 
 Python MCP server (mcp SDK + FastMCP) on **FastAPI** to manage Holded **invoices (invoicing)**.
